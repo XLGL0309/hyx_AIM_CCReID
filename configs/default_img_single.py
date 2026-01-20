@@ -11,19 +11,19 @@ _C.DATA = CN()
 # Root path for dataset directory
 _C.DATA.ROOT = 'DATA_ROOT'
 # Dataset for evaluation
-_C.DATA.DATASET = 'ltcc'
+_C.DATA.DATASET = 'prcc'
 # Workers for dataloader
-_C.DATA.NUM_WORKERS = 4
+_C.DATA.NUM_WORKERS = 2
 # Height of input image
-_C.DATA.HEIGHT = 384
+_C.DATA.HEIGHT = 256
 # Width of input image
-_C.DATA.WIDTH = 192
+_C.DATA.WIDTH = 128
 # Batch size for training
-_C.DATA.TRAIN_BATCH = 32 # org:32
+_C.DATA.TRAIN_BATCH = 4 # org:32
 # Batch size for testing
-_C.DATA.TEST_BATCH = 128 # org:128
+_C.DATA.TEST_BATCH = 8 # org:128
 # The number of instances per identity for training sampler
-_C.DATA.NUM_INSTANCES = 8
+_C.DATA.NUM_INSTANCES = 2
 # -----------------------------------------------------------------------------
 # Augmentation settings
 # -----------------------------------------------------------------------------
@@ -88,21 +88,21 @@ _C.LOSS.MOMENTUM = 0.
 # -----------------------------------------------------------------------------
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
-_C.TRAIN.MAX_EPOCH = 70
+_C.TRAIN.MAX_EPOCH = 60
 # Start epoch for clothes classification
-_C.TRAIN.START_EPOCH_CC = 25 # org:25
+_C.TRAIN.START_EPOCH_CC = 20 # org:25
 # Start epoch for adversarial training
 _C.TRAIN.START_EPOCH_ADV = 25 # org:25
 # Optimizer
 _C.TRAIN.OPTIMIZER = CN()
 _C.TRAIN.OPTIMIZER.NAME = 'adam'
 # Learning rate
-_C.TRAIN.OPTIMIZER.LR = 0.00035
+_C.TRAIN.OPTIMIZER.LR = 8e-5
 _C.TRAIN.OPTIMIZER.WEIGHT_DECAY = 5e-4
 # LR scheduler
 _C.TRAIN.LR_SCHEDULER = CN()
 # Stepsize to decay learning rate
-_C.TRAIN.LR_SCHEDULER.STEPSIZE = [20, 40] #, 60]
+_C.TRAIN.LR_SCHEDULER.STEPSIZE = [30, 45]
 # LR decay rate, used in StepLRScheduler
 _C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.1
 # Using amp for training
@@ -112,9 +112,9 @@ _C.TRAIN.AMP = False
 # -----------------------------------------------------------------------------
 _C.TEST = CN()
 # Perform evaluation after every N epochs (set to -1 to test after training)
-_C.TEST.EVAL_STEP = 5
+_C.TEST.EVAL_STEP = 10
 # Start to evaluate after specific epoch
-_C.TEST.START_EVAL = 0
+_C.TEST.START_EVAL = 10
 # -----------------------------------------------------------------------------
 # Misc
 # -----------------------------------------------------------------------------

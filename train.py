@@ -3,7 +3,7 @@ import time
 import datetime
 import logging
 import torch
-from apex import amp
+# from apex import amp
 from tools.utils import AverageMeter
 
 
@@ -62,11 +62,11 @@ def train_aim(config, epoch, model, model2, classifier, clothes_classifier, clot
         clothes_loss = criterion_clothes(pred_clothes, clothes_ids)
         if epoch >= config.TRAIN.START_EPOCH_CC:
             optimizer_cc.zero_grad()
-            if config.TRAIN.AMP:
-                with amp.scale_loss(clothes_loss, optimizer_cc) as scaled_loss:
-                    scaled_loss.backward()
-            else:
-                clothes_loss.backward()
+            # if config.TRAIN.AMP:
+            #     with amp.scale_loss(clothes_loss, optimizer_cc) as scaled_loss:
+            #         scaled_loss.backward()
+            # else:
+            clothes_loss.backward()
             optimizer_cc.step()
 
         # Update the backbone
@@ -93,11 +93,11 @@ def train_aim(config, epoch, model, model2, classifier, clothes_classifier, clot
             loss2 = clothes_loss2
 
         optimizer2.zero_grad()
-        if config.TRAIN.AMP:
-            with amp.scale_loss(loss2, optimizer2) as scaled_loss2:
-                scaled_loss2.backward()
-        else:
-            loss2.backward()
+        # if config.TRAIN.AMP:
+        #     with amp.scale_loss(loss2, optimizer2) as scaled_loss2:
+        #         scaled_loss2.backward()
+        # else:
+        loss2.backward()
         optimizer2.step()
 
         GENERAL_EPOCH = config.TRAIN.START_EPOCH_ADV
@@ -116,11 +116,11 @@ def train_aim(config, epoch, model, model2, classifier, clothes_classifier, clot
             loss = cla_loss + config.LOSS.PAIR_LOSS_WEIGHT * pair_loss
         
         optimizer.zero_grad()
-        if config.TRAIN.AMP:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
-        else:
-            loss.backward()
+        # if config.TRAIN.AMP:
+        #     with amp.scale_loss(loss, optimizer) as scaled_loss:
+        #         scaled_loss.backward()
+        # else:
+        loss.backward()
         optimizer.step()
 
         # statistics

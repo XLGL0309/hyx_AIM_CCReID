@@ -4,8 +4,12 @@ import torch
 import threading
 import queue
 from torch.utils.data import DataLoader
-from torch import distributed as dist
 
+# ==========  修改1：分布式导入改为可选，添加单卡兼容判断 ==========
+try:
+    from torch import distributed as dist
+except ImportError:
+    dist = None
 
 """
 #based on http://stackoverflow.com/questions/7323664/python-generator-pre-fetch
@@ -71,7 +75,9 @@ class BackgroundGenerator(threading.Thread):
         self.start()
 
     def run(self):
-        torch.cuda.set_device(self.local_rank)
+        # ==========  修改2：单卡环境下默认使用cuda:0，分布式环境按local_rank设置设备 ==========
+        if torch.cuda.is_available():
+            torch.cuda.set_device(self.local_rank)
         for item in self.generator:
             if self.exit_event.is_set():
                 break
@@ -95,9 +101,17 @@ class BackgroundGenerator(threading.Thread):
 class DataLoaderX(DataLoader):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        local_rank = dist.get_rank()
-        self.stream = torch.cuda.Stream(local_rank)  # create a new cuda stream in each process
-        self.local_rank = local_rank
+        # ==========  修改3：自适应获取local_rank，单卡环境默认0，分布式环境正常获取 ==========
+        if dist is not None and dist.is_available() and dist.is_initialized():
+            self.local_rank = dist.get_rank()
+        else:
+            self.local_rank = 0  # 单卡环境默认使用cuda:0
+
+        # ==========  修改4：单卡/分布式环境均创建cuda stream，保留原版预加载功能 ==========
+        if torch.cuda.is_available():
+            self.stream = torch.cuda.Stream(self.local_rank)
+        else:
+            self.stream = None
 
     def __iter__(self):
         self.iter = super().__iter__()
@@ -123,19 +137,21 @@ class DataLoaderX(DataLoader):
 
     def preload(self):
         self.batch = next(self.iter, None)
-        if self.batch is None:
+        if self.batch is None or self.stream is None:
             return None
         with torch.cuda.stream(self.stream):
             # if isinstance(self.batch[0], torch.Tensor):
             #     self.batch[0] = self.batch[0].to(device=self.local_rank, non_blocking=True)
             for k, v in enumerate(self.batch):
                 if isinstance(self.batch[k], torch.Tensor):
+                    # ==========  修改5：单卡/分布式环境均按local_rank加载数据到GPU，保留non_blocking=True ==========
                     self.batch[k] = self.batch[k].to(device=self.local_rank, non_blocking=True)
 
     def __next__(self):
-        torch.cuda.current_stream().wait_stream(
-            self.stream
-        )  # wait tensor to put on GPU
+        if self.stream is not None:
+            torch.cuda.current_stream().wait_stream(
+                self.stream
+            )  # wait tensor to put on GPU
         batch = self.batch
         if batch is None:
             raise StopIteration

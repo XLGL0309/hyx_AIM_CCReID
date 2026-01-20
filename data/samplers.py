@@ -16,6 +16,7 @@ class RandomIdentitySampler(Sampler):
         data_source (Dataset): dataset to sample from.
         num_instances (int): number of instances per identity.
     """
+
     def __init__(self, data_source, num_instances=4):
         self.data_source = data_source
         self.num_instances = num_instances
@@ -78,7 +79,8 @@ class DistributedRandomIdentitySampler(Sampler):
         This number should be identical across all
         processes in the distributed group. Default: ``0``.
     """
-    def __init__(self, data_source, num_instances=4, 
+
+    def __init__(self, data_source, num_instances=4,
                  num_replicas=None, rank=None, seed=0):
         if num_replicas is None:
             if not dist.is_available():
@@ -115,10 +117,11 @@ class DistributedRandomIdentitySampler(Sampler):
             self.length += num - num % self.num_instances
         assert self.length % self.num_instances == 0
 
-        if self.length // self.num_instances % self.num_replicas != 0: 
-            self.num_samples = math.ceil((self.length // self.num_instances - self.num_replicas) / self.num_replicas) * self.num_instances
+        if self.length // self.num_instances % self.num_replicas != 0:
+            self.num_samples = math.ceil(
+                (self.length // self.num_instances - self.num_replicas) / self.num_replicas) * self.num_instances
         else:
-            self.num_samples = math.ceil(self.length / self.num_replicas) 
+            self.num_samples = math.ceil(self.length / self.num_replicas)
         self.total_size = self.num_samples * self.num_replicas
 
     def __iter__(self):
@@ -141,12 +144,12 @@ class DistributedRandomIdentitySampler(Sampler):
         random.shuffle(list_container)
 
         # remove tail of data to make it evenly divisible.
-        list_container = list_container[:self.total_size//self.num_instances]
-        assert len(list_container) == self.total_size//self.num_instances
+        list_container = list_container[:self.total_size // self.num_instances]
+        assert len(list_container) == self.total_size // self.num_instances
 
         # subsample
-        list_container = list_container[self.rank:self.total_size//self.num_instances:self.num_replicas]
-        assert len(list_container) == self.num_samples//self.num_instances
+        list_container = list_container[self.rank:self.total_size // self.num_instances:self.num_replicas]
+        assert len(list_container) == self.num_samples // self.num_instances
 
         ret = []
         for batch_idxs in list_container:
@@ -181,6 +184,7 @@ class DistributedInferenceSampler(Sampler):
     samples to the sampler to make it evenly divisible (like in `DistributedSampler`)
     to make it easy to `gather` or `reduce` resulting tensors at the end of the loop.
     """
+
     def __init__(self, dataset, rank=None, num_replicas=None):
         if num_replicas is None:
             if not dist.is_available():
@@ -202,7 +206,7 @@ class DistributedInferenceSampler(Sampler):
         # add extra samples to make it evenly divisible
         indices += [indices[-1]] * (self.total_size - len(indices))
         # subsample
-        indices = indices[self.rank * self.num_samples : (self.rank + 1) * self.num_samples]
+        indices = indices[self.rank * self.num_samples: (self.rank + 1) * self.num_samples]
         return iter(indices)
 
     def __len__(self):
