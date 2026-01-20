@@ -1,0 +1,26 @@
+# 默认忽略的 IDE 相关文件
+/shelf/
+/workspace.xml
+
+# 基于编辑器的 HTTP 客户端请求
+/httpRequests/
+
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+
+# 忽略 Python 编译文件和缓存目录
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+
+# 忽略数据集目录（核心新增规则）
+data/datasets/prcc/
+data/datasets/LTCC_ReID/
+
+# 可选：忽略 IDE 配置目录
+.idea/
