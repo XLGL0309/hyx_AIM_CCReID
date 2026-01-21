@@ -30,9 +30,9 @@ _C.DATA.NUM_INSTANCES = 8
 # Augmentation settings
 # -----------------------------------------------------------------------------
 _C.AUG = CN()
-# Random crop prob (提升至0.5，增强数据泛化能力)
+# Random crop prob
 _C.AUG.RC_PROB = 0.5
-# Random erase prob (提升至0.5，增强数据泛化能力)
+# Random erase prob
 _C.AUG.RE_PROB = 0.5
 # Random flip prob
 _C.AUG.RF_PROB = 0.5
@@ -83,8 +83,8 @@ _C.LOSS.PAIR_LOSS_WEIGHT = 0.1
 # -----------------------------------------------------------------------------
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
-# 最大训练轮数，兼顾效果与耗时
-_C.TRAIN.MAX_EPOCH = 80
+# 最大训练轮数
+_C.TRAIN.MAX_EPOCH = 50
 # Start epoch for clothes classification
 _C.TRAIN.START_EPOCH_CC = 25
 # Start epoch for adversarial training
@@ -100,7 +100,7 @@ _C.TRAIN.OPTIMIZER.WEIGHT_DECAY = 5e-4
 # LR scheduler
 _C.TRAIN.LR_SCHEDULER = CN()
 # Stepsize to decay learning rate (延后至40、60，匹配80Epoch训练周期)
-_C.TRAIN.LR_SCHEDULER.STEPSIZE = [40, 60]
+_C.TRAIN.LR_SCHEDULER.STEPSIZE = [30, 40]
 # LR decay rate， used in StepLRScheduler
 _C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.1
 # -----------------------------------------------------------------------------
@@ -127,8 +127,8 @@ _C.TAG = 'eval_single_gpu_3060'
 # -----------------------------------------------------------------------------
 # Hyperparameters
 # 降低超参数权重，减少计算量和显存占用
-_C.k_cal = 0.5
-_C.k_kl = 0.5
+_C.k_cal = 1.0
+_C.k_kl = 1.0
 
 # -----------------------------------------------------------------------------
 def update_config(config, args):
@@ -136,7 +136,8 @@ def update_config(config, args):
 
     # ==========  优化：复用yacs原生merge_from_file，规范yaml加载逻辑 ==========
     # 移除自定义yaml读取，使用原生方法（自带文件校验、编码处理）
-    config.merge_from_file(args.cfg)
+    if hasattr(args, 'cfg') and args.cfg:
+        config.merge_from_file(args.cfg)
 
     # merge from specific arguments
     if args.root:
@@ -166,11 +167,15 @@ def update_config(config, args):
 
     # 3. 扫描该数据集目录下的数字文件夹，获取最大编号（仅统计当前数据集的）
     num_folders = []
-    for item in os.listdir(dataset_dir):
-        item_path = os.path.join(dataset_dir, item)
-        # 只筛选纯数字的文件夹（1、2、3...）
-        if os.path.isdir(item_path) and item.isdigit():
-            num_folders.append(int(item))
+    try:
+        for item in os.listdir(dataset_dir):
+            item_path = os.path.join(dataset_dir, item)
+            # 只筛选纯数字的文件夹（1、2、3...）
+            if os.path.isdir(item_path) and item.isdigit():
+                num_folders.append(int(item))
+    except Exception as e:
+        print(f"Warning: 扫描数据集目录时出错({e})，默认从1开始编号")
+        num_folders = []
 
     # 4. 确定新文件夹编号（无数字文件夹则从1开始）
     if num_folders:
