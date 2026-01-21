@@ -1,15 +1,11 @@
 import os
-import sys
 import time
 import datetime
 import argparse
-import logging
 import os.path as osp
 import numpy as np
 import gc
-
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
 
@@ -59,7 +55,6 @@ def parse_option():
 
 
 def main(config):
-    # ==========  优化：仅定义一次device变量，全局复用（消除冗余） ==========
     device = torch.device(f"cuda:{config.GPU}" if torch.cuda.is_available() else "cpu")
 
     # Build dataloader
