@@ -27,6 +27,7 @@ from tools.utils import save_checkpoint, set_seed, get_logger
 from train import train_aim
 from test import test, test_prcc
 
+
 def parse_option():
     parser = argparse.ArgumentParser(
         description='Train clothes-changing re-id model with clothes-based adversarial loss')
@@ -47,9 +48,16 @@ def parse_option():
     parser.add_argument('--single_shot', action='store_true', help='single-shot option')
     parser.add_argument('--k_cal', type=str)
     parser.add_argument('--k_kl', type=str)
+    # ==========  新增：自停机制相关参数 ==========
+    parser.add_argument('--patience', type=int, default=20, help='最大无提升epoch数，超过则停止训练')
+    parser.add_argument('--min_delta', type=float, default=1e-4, help='指标最小提升阈值，小于该值视为无提升')
 
     args, unparsed = parser.parse_known_args()
     config = get_img_config(args)
+
+    # 将自停参数添加到config中
+    config.PATIENCE = args.patience
+    config.MIN_DELTA = args.min_delta
 
     return config
 
@@ -162,12 +170,19 @@ def main(config):
                 test(config, model, queryloader, galleryloader, dataset)
         return
 
+    # ==========  自停机制初始化 ==========
+    patience = config.PATIENCE  # 最大无提升epoch数
+    min_delta = config.MIN_DELTA  # 最小提升阈值
+    no_improve_epochs = 0  # 连续无提升epoch计数
+    best_rank1 = -np.inf  # 最佳Rank-1指标
+    best_epoch = 0  # 最佳epoch
+
     start_time = time.time()
     train_time = 0
-    best_rank1 = -np.inf
-    best_epoch = 0
     # ==========  修改点6：修改日志信息，标注单卡3060运行 ==========
     logger.info("==> Start training (single GPU: 3060 6GB)")
+    logger.info(f"==> Early stopping config - patience: {patience}, min_delta: {min_delta}")
+
     for epoch in range(start_epoch, config.TRAIN.MAX_EPOCH):
         # ==========  修改点7：注释分布式sampler.set_epoch()代码，单卡无需打乱 ==========
         """
@@ -196,48 +211,107 @@ def main(config):
             # 评估完成后恢复训练模式
             model.train()
             torch.cuda.empty_cache()
-            is_best = rank1 > best_rank1
-            if is_best:
+
+            # ==========  自停机制核心逻辑 ==========
+            # 判断当前指标是否有有效提升
+            if rank1 - best_rank1 > min_delta:
                 best_rank1 = rank1
                 best_epoch = epoch + 1
+                no_improve_epochs = 0  # 重置无提升计数
+                logger.info(f"==> New best Rank-1: {best_rank1:.1%} (epoch {best_epoch})")
+            else:
+                no_improve_epochs += 1  # 无提升，计数+1
+                logger.info(
+                    f"==> No improvement - current Rank-1: {rank1:.1%}, best: {best_rank1:.1%}, no improve epochs: {no_improve_epochs}/{patience}")
 
-            # ==========  修改点9：注释分布式module.相关代码，单卡直接获取模型状态字典 ==========
-            model_state_dict = model.state_dict()
-            model2_state_dict = model2.state_dict()
-            fuse_state_dict = fuse.state_dict()
-            classifier_state_dict = classifier.state_dict()
-            clothes_classifier_state_dict = clothes_classifier.state_dict()
-            clothes_classifier2_state_dict = clothes_classifier2.state_dict()
-            """
-            分布式module.状态字典代码（单卡训练注释掉，如需恢复分布式请取消注释）：
-            model_state_dict = model.module.state_dict()
-            model2_state_dict = model2.module.state_dict()
-            fuse_state_dict = fuse.module.state_dict()
-            classifier_state_dict = classifier.module.state_dict()
-            clothes_classifier_state_dict = clothes_classifier.state_dict()
-            clothes_classifier2_state_dict = clothes_classifier2.module.state_dict()
-            """
+            # 保存模型（仅最佳模型/定期保存）
+            is_best = rank1 == best_rank1
+            if is_best or (epoch + 1) % 10 == 0:  # 保存最佳模型 + 每10epoch保存一次
+                # ==========  修改点9：注释分布式module.相关代码，单卡直接获取模型状态字典 ==========
+                model_state_dict = model.state_dict()
+                model2_state_dict = model2.state_dict()
+                fuse_state_dict = fuse.state_dict()
+                classifier_state_dict = classifier.state_dict()
+                clothes_classifier_state_dict = clothes_classifier.state_dict()
+                clothes_classifier2_state_dict = clothes_classifier2.state_dict()
+                """
+                分布式module.状态字典代码（单卡训练注释掉，如需恢复分布式请取消注释）：
+                model_state_dict = model.module.state_dict()
+                model2_state_dict = model2.module.state_dict()
+                fuse_state_dict = fuse.module.state_dict()
+                classifier_state_dict = classifier.module.state_dict()
+                clothes_classifier_state_dict = clothes_classifier.state_dict()
+                clothes_classifier2_state_dict = clothes_classifier2.module.state_dict()
+                """
 
-            # ==========  修改点10：注释分布式local_rank判断代码，单卡直接保存权重 ==========
-            save_checkpoint({
-                'model_state_dict': model_state_dict,
-                'model2_state_dict': model2_state_dict,
-                'fuse_state_dict': fuse_state_dict,
-                'classifier_state_dict': classifier_state_dict,
-                'clothes_classifier_state_dict': clothes_classifier_state_dict,
-                'clothes_classifier2_state_dict': clothes_classifier2_state_dict,
-                'rank1': rank1,
-                'epoch': epoch,
-            }, is_best, osp.join(config.OUTPUT, 'checkpoint_ep' + str(epoch + 1) + '.pth.tar'))
+                # ==========  修改点10：注释分布式local_rank判断代码，单卡直接保存权重 ==========
+                save_checkpoint({
+                    'model_state_dict': model_state_dict,
+                    'model2_state_dict': model2_state_dict,
+                    'fuse_state_dict': fuse_state_dict,
+                    'classifier_state_dict': classifier_state_dict,
+                    'clothes_classifier_state_dict': clothes_classifier_state_dict,
+                    'clothes_classifier2_state_dict': clothes_classifier2_state_dict,
+                    'rank1': rank1,
+                    'epoch': epoch,
+                }, is_best, osp.join(config.OUTPUT, 'checkpoint_ep' + str(epoch + 1) + '.pth.tar'))
+
+            # ==========  触发自停条件 ==========
+            if no_improve_epochs >= patience:
+                logger.info(f"==> Early stopping triggered! No improvement for {patience} epochs.")
+                logger.info(f"==> Best Rank-1 {best_rank1:.1%} achieved at epoch {best_epoch}")
+                break  # 终止训练循环
+
         scheduler.step()
         scheduler2.step()
 
+    # 训练结束总结
     logger.info("==> Best Rank-1 {:.1%}, achieved at epoch {}".format(best_rank1, best_epoch))
 
     elapsed = round(time.time() - start_time)
     elapsed = str(datetime.timedelta(seconds=elapsed))
     train_time = str(datetime.timedelta(seconds=train_time))
     logger.info("Finished. Total elapsed time (h:m:s): {}. Training time (h:m:s): {}.".format(elapsed, train_time))
+
+    # ========== 新增：自动清理多余模型 ==========
+    logger.info("==> Start cleaning up redundant checkpoints...")
+    output_dir = config.OUTPUT
+    files_to_keep = []
+
+    # 1. 必须保留的文件：仅保留最佳模型和日志
+    best_model_name = 'model_best.pth.tar'
+    files_to_keep.append(best_model_name)
+
+    # 2. 保留日志文件
+    log_file_name = 'log_train_single_gpu.log'
+    files_to_keep.append(log_file_name)
+
+    deleted_count = 0
+    deleted_size = 0
+
+    # 遍历输出目录，删除多余文件
+    try:
+        for filename in os.listdir(output_dir):
+            file_path = osp.join(output_dir, filename)
+            if osp.isfile(file_path):
+                # 只处理checkpoint文件，不处理文件夹和其他文件
+                if filename.startswith('checkpoint_ep') and filename.endswith('.pth.tar'):
+                    if filename not in files_to_keep:
+                        # 获取文件大小（MB）
+                        file_size = osp.getsize(file_path) / (1024 * 1024)
+                        # 删除文件
+                        os.remove(file_path)
+                        deleted_count += 1
+                        deleted_size += file_size
+                        logger.info(f"  - Deleted: {filename} ({file_size:.2f} MB)")
+    except Exception as e:
+        logger.warning(f"Warning: Error during cleanup: {e}")
+
+    # 清理完成日志
+    logger.info(f"==> Cleanup complete!")
+    logger.info(f"  - Deleted {deleted_count} files, saved {deleted_size:.2f} MB disk space.")
+    logger.info(f"  - Kept files: {', '.join(files_to_keep)}")
+    # ========================================
 
 
 if __name__ == '__main__':

@@ -1,1 +1,1 @@
-fork from https://github.com/BoomShakaY/AIM-CCReID.git
+python main.py --cfg configs/res50_cels_cal.yaml

@@ -10,9 +10,9 @@ _C = CN()
 # -----------------------------------------------------------------------------
 _C.DATA = CN()
 # Root path for dataset directory
-_C.DATA.ROOT = 'E:/PythonProjects/paper/AIM-CCReID/data/datasets'
-# Dataset for evaluation
-_C.DATA.DATASET = 'ltcc'
+_C.DATA.ROOT = 'E:/PythonProjects/hyx_AIM_CCReID/data/datasets'
+# Dataset for evaluation (修改默认数据集为prcc)
+_C.DATA.DATASET = 'prcc'
 # Workers for dataloader
 # 适配Windows环境+减少显存占用
 _C.DATA.NUM_WORKERS = 0
@@ -84,7 +84,7 @@ _C.LOSS.PAIR_LOSS_WEIGHT = 0.1
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
 # 最大训练轮数
-_C.TRAIN.MAX_EPOCH = 50
+_C.TRAIN.MAX_EPOCH = 80  # 保持你最优的80轮
 # Start epoch for clothes classification
 _C.TRAIN.START_EPOCH_CC = 25
 # Start epoch for adversarial training
@@ -99,10 +99,10 @@ _C.TRAIN.OPTIMIZER.LR = 8e-5
 _C.TRAIN.OPTIMIZER.WEIGHT_DECAY = 5e-4
 # LR scheduler
 _C.TRAIN.LR_SCHEDULER = CN()
-# Stepsize to decay learning rate (延后至40、60，匹配80Epoch训练周期)
-_C.TRAIN.LR_SCHEDULER.STEPSIZE = [30, 40]
+# Stepsize to decay learning rate (保持你最优的[40,60])
+_C.TRAIN.LR_SCHEDULER.STEPSIZE = [40,60]
 # LR decay rate， used in StepLRScheduler
-_C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.1
+_C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.1  # 保持你最优的0.1
 # -----------------------------------------------------------------------------
 # Testing settings
 # -----------------------------------------------------------------------------
@@ -121,21 +121,18 @@ _C.EVAL_MODE = False
 # GPU device ids for CUDA_VISIBLE_DEVICES
 _C.GPU = '0'
 # Path to output folder (修正路径拼写，匹配实际项目)
-_C.OUTPUT = 'E:/PythonProjects/paper/AIM-CCReID/results'
+_C.OUTPUT = 'E:/PythonProjects/hyx_AIM_CCReID/results'
 # Tag of experiment
 _C.TAG = 'eval_single_gpu_3060'
 # -----------------------------------------------------------------------------
-# Hyperparameters
-# 降低超参数权重，减少计算量和显存占用
+# Hyperparameters (仅保留基础k值，移除动态权重相关)
 _C.k_cal = 1.0
 _C.k_kl = 1.0
-
 # -----------------------------------------------------------------------------
 def update_config(config, args):
     config.defrost()
 
     # ==========  优化：复用yacs原生merge_from_file，规范yaml加载逻辑 ==========
-    # 移除自定义yaml读取，使用原生方法（自带文件校验、编码处理）
     if hasattr(args, 'cfg') and args.cfg:
         config.merge_from_file(args.cfg)
 
@@ -153,7 +150,6 @@ def update_config(config, args):
     if args.dataset:
         config.DATA.DATASET = args.dataset
     if args.gpu:
-        # 强制转换GPU参数类型为字符串，避免yacs类型冲突
         config.GPU = str(args.gpu)
 
     # ==========  核心修改：按数据集分类生成独立编号 ==========
