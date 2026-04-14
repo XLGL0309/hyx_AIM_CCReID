@@ -127,6 +127,5 @@ results/
 *.pth
 
 # 临时文件
-trainraw.py
 *.bak
 *.tmp

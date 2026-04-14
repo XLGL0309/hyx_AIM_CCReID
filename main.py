@@ -48,16 +48,26 @@ def parse_option():
     parser.add_argument('--single_shot', action='store_true', help='single-shot option')
     parser.add_argument('--k_cal', type=str)
     parser.add_argument('--k_kl', type=str)
-    # ==========  新增：自停机制相关参数 ==========
-    parser.add_argument('--patience', type=int, default=20, help='最大无提升epoch数，超过则停止训练')
+    # ==========  自停机制相关参数 ==========
+    parser.add_argument('--patience', type=int, default=10, help='最大无提升epoch数，超过则停止训练')
     parser.add_argument('--min_delta', type=float, default=1e-4, help='指标最小提升阈值，小于该值视为无提升')
 
     args, unparsed = parser.parse_known_args()
+
+    # 1. 先获取config（此时config是冻结的）
     config = get_img_config(args)
 
-    # 将自停参数添加到config中
+    # ========== 核心修改：仅在main.py里处理，不碰default_img.py ==========
+    # 2. 手动解冻config
+    config.defrost()
+
+    # 3. 动态添加自停参数（直接赋值，yacs允许在解冻状态下加新属性）
     config.PATIENCE = args.patience
     config.MIN_DELTA = args.min_delta
+
+    # 4. 重新冻结config，保持安全
+    config.freeze()
+    # ========================================================================
 
     return config
 

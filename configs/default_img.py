@@ -84,7 +84,7 @@ _C.LOSS.PAIR_LOSS_WEIGHT = 0.1
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
 # 最大训练轮数
-_C.TRAIN.MAX_EPOCH = 80  # 保持你最优的80轮
+_C.TRAIN.MAX_EPOCH = 80
 # Start epoch for clothes classification
 _C.TRAIN.START_EPOCH_CC = 25
 # Start epoch for adversarial training
@@ -97,12 +97,12 @@ _C.TRAIN.OPTIMIZER.NAME = 'adam'
 # Learning rate
 _C.TRAIN.OPTIMIZER.LR = 8e-5
 _C.TRAIN.OPTIMIZER.WEIGHT_DECAY = 5e-4
-# LR scheduler
+# LR scheduler (修改3：核心改动，延后衰减+降低幅度，解决后期跳水)
 _C.TRAIN.LR_SCHEDULER = CN()
-# Stepsize to decay learning rate (保持你最优的[40,60])
-_C.TRAIN.LR_SCHEDULER.STEPSIZE = [40,60]
-# LR decay rate， used in StepLRScheduler
-_C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.1  # 保持你最优的0.1
+# Stepsize to decay learning rate (从[40,60]改为[50,70]，多给10个epoch高LR空间)
+_C.TRAIN.LR_SCHEDULER.STEPSIZE = [50, 70]
+# LR decay rate (从0.1改为0.3，LR不会一下降到几乎为0)
+_C.TRAIN.LR_SCHEDULER.DECAY_RATE = 0.3
 # -----------------------------------------------------------------------------
 # Testing settings
 # -----------------------------------------------------------------------------
